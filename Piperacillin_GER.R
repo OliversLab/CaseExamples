@@ -13,7 +13,7 @@ library(gridExtra)
 ## Li et al. Journal of Antimicrobial Chemotherapy (2005) 56, 388-395
 
 piperacillin_single_dose <- function(par = c(ETA1=0,           # par ist ein Vektor, enthält
-                                             ETA2=0),          # Benutzerdefinierte Abweichung vom typischene Patienten
+                                             ETA2=0),          # Benutzerdefinierte Abweichung vom typischen Patienten
                                      omg = c(OMEGA1=0.277,     # Die im popPK Modell hinterlegten Standardabweichungen
                                              OMEGA2=0.252),    # der Modellparameter CL und Vd werden hier abgelegt
                                      rem = c(PROP=0.185,       # Das residuale Fehlermodell mit proportionalem
@@ -74,19 +74,19 @@ piperacillin_single_dose <- function(par = c(ETA1=0,           # par ist ein Vek
                         popCL=popCL,
                         popVd=popVd)
   
-  ##... und als Ergebnis der Funktion zurückgeben
+  ##... und als Gesamtergebnis der Funktion zurückgeben
   return(results)  
 }
 
 ## Zeit unseren Patienten zu simulieren
 
 TIME <- seq(0,8,by=0.01)   ## Zeitpunkte zu simulieren
-AMT <- 4000               ## Applizierte Dosis in mg
-DUR <- 1                  ## Infusionsdauer (Tinf) in Stunden
+AMT <- 4000                ## Applizierte Dosis in mg
+DUR <- 1                   ## Infusionsdauer (Tinf) in Stunden
 CLcr <- 131                ## Kreatininclearance in mL/h
-WT <- 75                 ## Patientengewicht in kg
-MIC <- 2                  ## minimale Hemmkonzentration in mg/L
-PK_TARGET <- 4 * MIC      ## PK/PD-Ziel 4x MHK
+WT <- 75                   ## Patientengewicht in kg
+MIC <- 2                   ## minimale Hemmkonzentration in mg/L
+PK_TARGET <- 4 * MIC       ## PK/PD-Ziel 4x MHK
 
 ## Simulation eines typischen Patienten mit den Kovariaten unseres Individuums
 ## interindividuelle Variabilität wird hier ausgeschaltet, da wir
@@ -118,7 +118,7 @@ print(paste("Das typische Verteilungsvolumen für Piperacillin eines Patienten m
 ## MC Simulation
 ## Durch mehrfache Simulieren des gleichen Patienten
 ## Werden innerhalb der Funktion jedesmal andere Werte für ecl und evd 
-## aus der Normalverteilung "gezogen"
+## aus der Normalverteilung "gezogen" -> rnorm(...) zieht zufällige Stichproben aus der Normalverteilung
 
 mc_data <- NULL
 
@@ -127,9 +127,14 @@ for(i in 1:1000){
   mc_data <- rbind(mc_data, tmp_data)
 }
 
+
+## Modellparameter der 1000 virtuellen Patienten aus den Daten herausziehen
+
 mc_pop_cl <- (mc_data[mc_data$TIME==0,]$indCL)
 mc_pop_vd <- (mc_data[mc_data$TIME==0,]$indVd)
 
+
+## Histogramme vorbereiten
 
 pl_dens_cl <- ggplot() + geom_histogram(aes(x=mc_pop_cl, y=..density..), fill="white", colour="black", bins=50) + theme_bw() +
   xlab("CL [L/h]") + ylab("Häufigkeit") +
@@ -162,6 +167,7 @@ mc_data_2 <- data.frame(TIME=TIME,
                         s7=s[4,],s8=s[5,], # 80%
                         median=s[9,])      # median => Sollte sich mit der pop_prediction decken
 
+## Abbildung mit Vorhersageintervall erstellen
 
 pl_2 <- ggplot(data=mc_data_2) + geom_line(mapping = aes(x=TIME, y=median)) +
   geom_ribbon(mapping = aes(x=TIME, ymin = s1, ymax=s2), alpha=0.15) +
@@ -274,16 +280,24 @@ pl_4 <- ggplot(data=mc_data_2) + geom_line(mapping = aes(x=TIME, y=median)) +
   theme_bw() + xlab("Zeit seit Dosis [h]") + ylab("Konzentration [mg/L]") +
   theme(axis.title = element_text(size=18), axis.text = element_text(size=18), plot.title = element_text(size=18), plot.subtitle = element_text(size=16))
 
-
+## Vorbereiten der Histogramme
 pl_dens_vd_extended <- pl_dens_vd + geom_vline(aes(xintercept=ind_prediction[1,]$indVd), size=3, alpha=0.5, colour="red")
 pl_dens_cl_extended <- pl_dens_cl + geom_vline(aes(xintercept=ind_prediction[1,]$indCL), size=3, alpha=0.5, colour="red") 
 
 
-grid.arrange(pl_4, grid.arrange(pl_dens_vd_extended, pl_dens_cl_extended, nrow=2), ncol=2, widths=c(2,1))
 
-grid.arrange(pl_2, grid.arrange(pl_dens_vd, pl_dens_cl, nrow=2), ncol=2, widths=c(2,1))
 
-grid.arrange(pl_3, grid.arrange(pl_dens_vd, pl_dens_cl, nrow=2), ncol=2, widths=c(2,1))
+## Abbildungen erzeugen
 
+## Abbildung A
 pl_1 + annotate(geom= "text", x=4, y= 170, label= paste("typische Piperacillin-Clearance:", round(pop_prediction[1,]$indCL,2), "L/h"), size=6) +
   annotate(geom= "text", x=4, y= 150, label= paste("typisches Verteilungsvolumen:", round(pop_prediction[1,]$indVd,2), "L"), size=6)
+
+## Abbildung B
+grid.arrange(pl_2, grid.arrange(pl_dens_vd, pl_dens_cl, nrow=2), ncol=2, widths=c(2,1))
+
+## Abbildung C
+grid.arrange(pl_3, grid.arrange(pl_dens_vd, pl_dens_cl, nrow=2), ncol=2, widths=c(2,1))
+
+## Abbildung D
+grid.arrange(pl_4, grid.arrange(pl_dens_vd_extended, pl_dens_cl_extended, nrow=2), ncol=2, widths=c(2,1))
