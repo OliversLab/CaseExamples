@@ -109,16 +109,20 @@ pl_1 <- ggplot(data = pop_prediction) +                        ## Definiere Date
   annotate(geom = "text", x=7, y=PK_TARGET*2, label="4-fache MHK", size=6 ) +   # und beschriften
   xlab("Zeit seit Dosis [h]") +                        ## Beschriftung von x- ...
   ylab("Konzentration [mg/L]") +                         ## und y-Achse
-  theme(axis.title = element_text(size=18), axis.text = element_text(size=18), plot.title = element_text(size=18), plot.subtitle = element_text(size=16))
+  theme(axis.title = element_text(size=18), axis.text = element_text(size=18), plot.title = element_text(size=18), plot.subtitle = element_text(size=16)) + 
+  annotate(geom= "text", x=4, y= 170, label= paste("typische Piperacillin-Clearance:", round(pop_prediction[1,]$indCL,2), "L/h"), size=6) +
+  annotate(geom= "text", x=4, y= 150, label= paste("typisches Verteilungsvolumen:", round(pop_prediction[1,]$indVd,2), "L"), size=6)
 
-print(paste("Die typische Piperacillin-Clearance eines Patienten mit diesen Kovariaten beträgt:", round(pop_prediction[1,]$popCL,2), "L/h"))
-print(paste("Das typische Verteilungsvolumen für Piperacillin eines Patienten mit diesen Kovariaten beträgt:", round(pop_prediction[1,]$popVd,2), "L"))
 
+## Abbildung anzeigen
+
+pl_1 
 
 ## MC Simulation
 ## Durch mehrfache Simulieren des gleichen Patienten
 ## Werden innerhalb der Funktion jedesmal andere Werte für ecl und evd 
 ## aus der Normalverteilung "gezogen" -> rnorm(...) zieht zufällige Stichproben aus der Normalverteilung
+## Dies kann einige Minuten dauern
 
 mc_data <- NULL
 
@@ -128,7 +132,7 @@ for(i in 1:1000){
 }
 
 
-## Modellparameter der 1000 virtuellen Patienten aus den Daten herausziehen
+## Modellparameter (CL und Vd) der 1000 virtuellen Patienten aus den Daten herausziehen
 
 mc_pop_cl <- (mc_data[mc_data$TIME==0,]$indCL)
 mc_pop_vd <- (mc_data[mc_data$TIME==0,]$indVd)
@@ -179,6 +183,11 @@ pl_2 <- ggplot(data=mc_data_2) + geom_line(mapping = aes(x=TIME, y=median)) +
   theme_bw() + xlab("Zeit seit Dosis [h]") + ylab("Konzentration [mg/L]") +
   theme(axis.title = element_text(size=18), axis.text = element_text(size=18), plot.title = element_text(size=18), plot.subtitle = element_text(size=16))
 
+## Abbildung anzeigen
+grid.arrange(pl_2, grid.arrange(pl_dens_vd, pl_dens_cl, nrow=2), ncol=2, widths=c(2,1))
+
+## Jetzt kommt TDM hinzu
+
 ## Konzentrationsbestimmung nach 2 und 5 Stunden
 tdm_data <- data.frame(conc=c(50, 12), # gemessene Konzentration (mg/L)
                        times=c(2, 5))   # zum Zeitpunkt x in Stunden
@@ -193,6 +202,9 @@ pl_3 <- ggplot(data=mc_data_2) + geom_line(mapping = aes(x=TIME, y=median)) +
   annotate(geom = "text", x=7, y=PK_TARGET*2, label="4-fache MHK", size=6 ) + 
   theme_bw() + xlab("Zeit seit Dosis [h]") + ylab("Konzentration [mg/L]") +
   theme(axis.title = element_text(size=18), axis.text = element_text(size=18), plot.title = element_text(size=18), plot.subtitle = element_text(size=16))
+
+## Abbildung anzeigen
+grid.arrange(pl_3, grid.arrange(pl_dens_vd, pl_dens_cl, nrow=2), ncol=2, widths=c(2,1))
 
 ## Anpassung nach dem maximum a posteriori Bayesischen Prinzip
 ## => Ermittlung der Parameter die am "besten" zu den neuen Daten (TDM-Daten)
@@ -214,7 +226,7 @@ obj_func <- function(par,               # Hier werden verschiedene Werte für ET
   measured_conc <- tdm_data$conc
   times <- tdm_data$times
   
-  simulated_conc = piperacillin_single_dose(par=par,
+  simulated_conc = piperacillin_single_dose(par=par, # Die aktuell probierte Kombination aus ETA1 und ETA2
                                             amt=dosage_data[["AMT"]], 
                                             dur=dosage_data[["DUR"]], 
                                             time=times,                     ## Nur die TDM Zeitpunkte müssen Simuliert werden
@@ -229,12 +241,12 @@ obj_func <- function(par,               # Hier werden verschiedene Werte für ET
   ## Werte in ETA1 und ETA2 (=Abweichung vom typischen Patienten) addiert
   
   sig2 <- (simulated_conc*rem[["PROP"]]+rem[["ADD"]])^2
-  obj_res <- sum( (measured_conc-simulated_conc)^2/(sig2)+log(sig2)) + sum( ((par-0)^2)/(omg^2)) 
+  OFV <- sum( (measured_conc-simulated_conc)^2/(sig2)+log(sig2)) + sum( ((par-0)^2)/(omg^2)) ## <- Hier wird der OFV berechnet
   
   ## Bedeutet also, ein ETA darf umso weiter abweichen, je größer die im Modell hinterlegte Standardabweichung OMEGA ist
   ## => Zu starke Abweichung vom Modell wird dadurch "bestraft", dass ein hoher Funktionswert errechnet wird
   
-  return(obj_res)
+  return(OFV)
 }
 
 
@@ -285,13 +297,15 @@ pl_dens_vd_extended <- pl_dens_vd + geom_vline(aes(xintercept=ind_prediction[1,]
 pl_dens_cl_extended <- pl_dens_cl + geom_vline(aes(xintercept=ind_prediction[1,]$indCL), size=3, alpha=0.5, colour="red") 
 
 
+## Abbildung anzeigen
+grid.arrange(pl_4, grid.arrange(pl_dens_vd_extended, pl_dens_cl_extended, nrow=2), ncol=2, widths=c(2,1))
 
 
-## Abbildungen erzeugen
+#######################################
+## Abbildungen aus dem Artikel erzeugen
 
 ## Abbildung A
-pl_1 + annotate(geom= "text", x=4, y= 170, label= paste("typische Piperacillin-Clearance:", round(pop_prediction[1,]$indCL,2), "L/h"), size=6) +
-  annotate(geom= "text", x=4, y= 150, label= paste("typisches Verteilungsvolumen:", round(pop_prediction[1,]$indVd,2), "L"), size=6)
+pl_1 
 
 ## Abbildung B
 grid.arrange(pl_2, grid.arrange(pl_dens_vd, pl_dens_cl, nrow=2), ncol=2, widths=c(2,1))
