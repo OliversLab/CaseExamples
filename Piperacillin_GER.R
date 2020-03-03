@@ -240,7 +240,7 @@ obj_func <- function(par,               # Hier werden verschiedene Werte für ET
   ## Dazu wird die Summe der mit der Varianz OMEGA1² und OMEGA2² gewichteten Abweichung der 
   ## Werte in ETA1 und ETA2 (=Abweichung vom typischen Patienten) addiert
   
-  sig2 <- (simulated_conc*rem[["PROP"]]+rem[["ADD"]])^2
+  sig2 <- simulated_conc^2*rem[["PROP"]]^2+rem[["ADD"]]^2
   OFV <- sum( (measured_conc-simulated_conc)^2/(sig2)+log(sig2)) + sum( ((par-0)^2)/(omg^2)) ## <- Hier wird der OFV berechnet
   
   ## Bedeutet also, ein ETA darf umso weiter abweichen, je größer die im Modell hinterlegte Standardabweichung OMEGA ist
