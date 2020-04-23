@@ -124,7 +124,8 @@ pl_1
 ## aus der Normalverteilung "gezogen" -> rnorm(...) zieht zufällige Stichproben aus der Normalverteilung
 ## Dies kann einige Minuten dauern
 
-mc_data <- NULL
+mc_data <- NULL ## Für die R-Profis: Das ist nicht besonders effizient, 
+                ## der Speicher sollte vor der Schleife zugewiesen werden
 
 for(i in 1:1000){
   tmp_data <- piperacillin_single_dose(amt=AMT, dur=DUR, time=TIME, CLcr = CLcr, WT=WT, ID=i)
